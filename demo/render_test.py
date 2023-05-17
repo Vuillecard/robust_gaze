@@ -93,7 +93,7 @@ mesh = Meshes([verts ], [faces ], textures)
 #azim = torch.linspace(-90, 90, 1)
 #R, T = look_at_view_transform(0.35, elev=0, azim=azim, at=((0, -0.025, 0),), )
 #cameras = OpenGLPerspectiveCameras(device=device, R=R, T=T)
-print(0.03*180/np.pi, 0.02*180/np.pi)
+#print(0.03*180/np.pi, 0.02*180/np.pi)
 R, T = look_at_view_transform(10,0,0)
 T *= -1
 R = R@torch.Tensor([[[1,  0.,  0.],
