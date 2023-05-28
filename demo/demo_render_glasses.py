@@ -1,14 +1,14 @@
-
 import os
 import torch
 import matplotlib.pyplot as plt
-from matplotlib.colors import LightSource
 import numpy as np 
+
 # Util function for loading meshes
 from pytorch3d.io import load_objs_as_meshes, load_obj,load_ply
 import cv2
 # Data structures and functions for rendering
-from pytorch3d.structures import Meshes
+from matplotlib.colors import LightSource
+from pytorch3d.structures import Meshes,join_meshes_as_scene
 from pytorch3d.vis.plotly_vis import AxisArgs, plot_batch_individually, plot_scene
 from pytorch3d.vis.texture_vis import texturesuv_image_matplotlib
 from pytorch3d.renderer import (
@@ -43,13 +43,14 @@ DATA_DIR = "./data"
 #obj_filename = '/Users/pierre/PhD/code_base/robust_gaze/demo/data/mesh_coarse_transformed.obj'
 
 
-person_id = '00023100' # 00003900, 00023100 00007100
+person_id = '00003900' # 00003900, 00023100 00007100
 
 image_og_path = '/Users/pierre/Downloads/EMOCA_v2_lr_mse_20/'+person_id+'/inputs.png'
 # #obj_filename ='/Users/pierre/Downloads/EMOCA_v2_lr_mse_20/00003900/mesh_coarse.obj'
-obj_filename ='/Users/pierre/Downloads/EMOCA_v2_lr_mse_20/'+person_id+'/mesh_coarse_trans.obj'
+obj_filename_mesh ='/Users/pierre/Downloads/EMOCA_v2_lr_mse_20/'+person_id+'/mesh_coarse_trans.obj'
 # #obj_filename = '/Users/pierre/Downloads/EMOCA_v2_lr_mse_20/00003900/mesh_coarse_trans_detail.obj'
-
+obj_filename_glasses = '/Users/pierre/Downloads/EMOCA_v2_lr_mse_20/'+person_id+'/oculus.obj'
+obj_file_glasses_path = '/Users/pierre/Downloads/EMOCA_v2_lr_mse_20/'+person_id+'/45-oculos/oculos.obj'
 # Load obj file
 #mesh = load_objs_as_meshes([obj_filename], device=device)
 
@@ -67,10 +68,10 @@ def load_mesh(filename):
         raise ValueError("Unknown extension '%s'" % ext)
     return vertices, faces
 
-verts, faces = load_mesh(obj_filename)
+verts, faces = load_mesh(obj_filename_mesh)
 
 verts_rgb = torch.ones_like(verts)[None]  # (1, V, 3)
-
+verts_rgb[:,:,[0,1]] = 1
 # verts_rgb[:, :, 0] = 135 / 255
 # verts_rgb[:, :, 1] = 206 / 255
 # verts_rgb[:, :, 2] = 250 / 255
@@ -84,8 +85,27 @@ verts_rgb = torch.ones_like(verts)[None]  # (1, V, 3)
 # verts_rgb[:,:,1] = 191/255
 # verts_rgb[:,:,2] = 255/255
 
+verts_g, faces_g = load_mesh(obj_filename_glasses)
+mesh_g = load_objs_as_meshes([obj_file_glasses_path], device=device)
+mesh_glasses = Meshes([verts_g ], [faces_g ], mesh_g.textures)
+
+#change the texture color: 
+img_texture = cv2.imread(image_og_path)
+img_texture = np.ones_like(img_texture)*255
+cv2.imwrite(os.path.join('/Users/pierre/Downloads/EMOCA_v2_lr_mse_20/00003900','mesh_coarse_trans.png'),img_texture)
+
+
 textures = TexturesVertex(verts_features=verts_rgb.to(device))
 mesh = Meshes([verts ], [faces ], textures)
+
+mesh_head = load_objs_as_meshes([obj_filename_mesh], device=device)
+print(mesh_head.textures.maps_padded().shape)
+map_new = torch.zeros_like(mesh_head.textures.maps_padded())
+map_new[...,0] = 1
+mesh_head.textures = TexturesUV(maps=map_new.to(device), 
+                           faces_uvs=mesh_head.textures.faces_uvs_padded().to(device),
+                           verts_uvs=mesh_head.textures.verts_uvs_padded().to(device) )
+mesh_join = join_meshes_as_scene([mesh_head, mesh_glasses])
 
 
 # Initialize a camera.
@@ -119,7 +139,7 @@ raster_settings = RasterizationSettings(
 # -z direction. 
 
 # we use only diffuse lighting as described in the paper changing light 
-lights = DirectionalLights(device=device, direction=((1, 1, -1),),
+lights = DirectionalLights(device=device, direction=((0, 0, -1),),
                              ambient_color=((0.0, 0.0, 0.0),),
                              diffuse_color=((1., 1., 1.),),
                              specular_color=((1.0, 1.0, 1.0),)
@@ -148,16 +168,43 @@ renderer = MeshRenderer(
 )
 materials = Materials(
             device=device,
-            ambient_color= ((0, 0, 0), ),
+            ambient_color= ((1, 1, 1), ),
             diffuse_color = ((1, 1, 1), ),
-            specular_color = ((1, 1, 1), ),
+            specular_color = ((0, 0, 0), ),
             shininess=20
         )
-images = renderer(mesh,materials=materials)
+
+# materials = Materials(
+#             device=device,
+#             ambient_color= ((0, 0, 0), ),
+#             diffuse_color = ((1, 1, 1), ),
+#             specular_color = ((1, 1, 1), ),
+#             shininess=20
+#         )
+
+images = renderer(mesh_join,materials=materials)
 print(images.shape)
 plt.figure(figsize=(10, 10))
 plt.imshow(images[0, ..., :3].cpu().numpy())
 plt.savefig('render_test.png')
+
+#segmentation 
+twoDimage = cv2.imread('render_test.png')
+final_shape = twoDimage.shape
+twoDimage = twoDimage.reshape((-1,3))
+twoDimage = np.float32(twoDimage)
+criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+K = 3
+attempts=10
+ret,label,center=cv2.kmeans(twoDimage,K,None,criteria,attempts,cv2.KMEANS_PP_CENTERS)
+center = np.uint8(center)
+res = center[label.flatten()]
+result_image = res.reshape((final_shape))
+print(result_image)
+plt.figure(figsize=(10, 10))
+plt.axis('off')
+plt.imshow(result_image)
+plt.savefig('render_test_mask.png')
 
 img_og = cv2.imread(image_og_path)
 cv2.imwrite('render_txt.png', images[0,...,3].cpu().numpy()*255)

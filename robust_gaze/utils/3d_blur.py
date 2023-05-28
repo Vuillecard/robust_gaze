@@ -24,9 +24,6 @@ import numpy as np
 
 import tqdm
 
-
-
-
 ## Generate near focus and far focus
 
 def gaussian(M, std, sym=True, device=None):
