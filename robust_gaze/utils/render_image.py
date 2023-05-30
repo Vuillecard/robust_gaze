@@ -1,14 +1,36 @@
+import os
+import numpy as np
+import torch
+import cv2
+from matplotlib import pyplot as plt
+from pytorch3d.structures import Meshes, join_meshes_as_scene
+from pytorch3d.io import load_obj, load_objs_as_meshes
+from pytorch3d.renderer import (
+    look_at_view_transform,
+    FoVOrthographicCameras,
+    PointLights, 
+    DirectionalLights,
+    AmbientLights,
+    Materials, 
+    RasterizationSettings, 
+    MeshRenderer, 
+    MeshRasterizer,  
+    SoftPhongShader,
+    TexturesUV,
+    Textures,
+    BlendParams
+)
+
 # render lighting and accessory
-def render(face_filename, acc_filename, ambient=False, mode='face', direction=((-1,0,0),)):
+def render(face_mesh, acc_mesh, ambient=False, mode='face', direction=((-1,0,0),), specular_color=None):
     
     if torch.cuda.is_available():
         device = torch.device("cuda:0")
     else:
         device = torch.device("cpu")
     
-    # load face mesh object
-    face_mesh = load_objs_as_meshes([face_filename], device=device)
     #### replace face texture
+    face_mesh = face_mesh.to(device)
     texture_map = face_mesh.textures.maps_padded()
     if mode=='acc' and ambient:
         new_map = torch.zeros_like(texture_map)   
@@ -19,12 +41,10 @@ def render(face_filename, acc_filename, ambient=False, mode='face', direction=((
                              verts_uvs=face_mesh.textures.verts_uvs_padded())
     face_mesh.textures = new_texture
 
-    if acc_filename is not None:
-        # load acc mesh object
-        acc_mesh = load_objs_as_meshes([acc_filename], device=device)
+    if acc_mesh is not None:
         # concat face and acc mesh
+        acc_mesh = acc_mesh.to(device)
         mesh = join_meshes_as_scene([face_mesh, acc_mesh])
-        print(mesh.verts_list()[0].shape)
     else:
         mesh = face_mesh
 
@@ -68,9 +88,8 @@ def render(face_filename, acc_filename, ambient=False, mode='face', direction=((
     )
     blend_params = BlendParams(sigma=1e-4, gamma=1e-4, background_color=(0,0,0))
     if not ambient:
-        specular_color = [[0.1,0.1,0.1]]
-        if mode=='acc':
-            specular_color = [[1,1,1]]
+        if specular_color is None:
+            specular_color = [[0.1,0.1,0.1]]
         materials = Materials(
                     device=device,
                     ambient_color = [[1,1,1]],
@@ -91,11 +110,11 @@ def render(face_filename, acc_filename, ambient=False, mode='face', direction=((
 
 
 # main function
-def get_render(image_path, face_obj_path, acc_obj_path, direction):
+def get_render(image, face_mesh, acc_mesh, direction, specular_color):
     
     # render accessory
-    render_acc_dir = render_new(face_obj_path, acc_obj_path, mode='acc', direction=direction)
-    render_acc_amb = render_new(face_obj_path, acc_obj_path, mode='acc', ambient=True)
+    render_acc_dir = render(face_mesh, acc_mesh, mode='acc', direction=direction, specular_color=specular_color)
+    render_acc_amb = render(face_mesh, acc_mesh, mode='acc', ambient=True, specular_color=specular_color)
     light_img_acc = 0.6*render_acc_dir[0,:,:,:3].cpu().numpy() + 0.4*render_acc_amb[0,:,:,:3].cpu().numpy()
     
     # get accessory mask
@@ -104,21 +123,18 @@ def get_render(image_path, face_obj_path, acc_obj_path, direction):
     mask_acc = mask_acc.cpu().numpy()
     
     # render face
-    render_face = render_new(face_obj_path, None, mode='face', direction=direction)
+    render_face = render(face_mesh, None, mode='face', direction=direction)
     light_img_face = render_face[0,:,:,:3].cpu().numpy()
     light_img_face_norm = np.linalg.norm(light_img_face, axis=-1)
     
     # get face mask
-    mask_face = render_new(face_obj_path, None, ambient=True, mode='face')
+    mask_face = render(face_mesh, None, ambient=True, mode='face')
     mask_face = mask_face[0,:,:,:3]
     mask_face = mask_face.sum(axis=-1)!=0
     mask_face = mask_face.cpu().numpy()
     
-    # read og image
-    og_img = cv2.imread(image_path)
-    
     # modulate light value of og image
-    hls_image = cv2.cvtColor(og_img, cv2.COLOR_BGR2HSV)
+    hls_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     hue, saturation, lightness = cv2.split(hls_image)
     light_img_face_smooth = light_img_face_norm
     num_iters = 1
@@ -135,7 +151,9 @@ def get_render(image_path, face_obj_path, acc_obj_path, direction):
     modulated_image_scaled = modulated_image / 255.0
     light_img_acc = cv2.cvtColor(light_img_acc, cv2.COLOR_BGR2RGB)
     acc_img = light_img_acc*mask_acc + modulated_image_scaled*(1-mask_acc)
-    acc_img = acc_img[...,::-1]
+    
+    acc_img = acc_img * 255
+    acc_img = np.clip(acc_img, 0, 255).astype(np.uint8)
     
     return acc_img
     

@@ -23,13 +23,14 @@ def wrapper_find_transform(target):
     """ 
     wrapper function to compute the transformation between two 3d objects for EMOCA 3d face
     """
+    target = target.verts_list()[0]
     if not torch.is_tensor(target): 
         target = torch.tensor(target)
 
     path_head_template = os.path.join(DIR_3D_OBJECT,'head_template','head_template.obj')
     source ,_= load_obj_file(path_head_template)
 
-    transform_mat, scale = fit_3d_object(target.numpy()[FIT_SUPPORT_INDEX].T,source.numpy()[FIT_SUPPORT_INDEX].T)
+    transform_mat, scale = fit_3d_object(target.cpu().numpy()[FIT_SUPPORT_INDEX].T,source.cpu().numpy()[FIT_SUPPORT_INDEX].T)
 
     return { 'transform_mat': transform_mat, 'scale':scale}
 
@@ -45,7 +46,7 @@ def apply_transform(mesh_object : Meshes, transformation: Dict) -> Meshes:
     vertex_glasses_out = transformation['scale']*(object_verts@transform_mat[:3,:3].T + transform_mat[:3,3])
 
     # save the fitted object
-    mesh_object_fitted = Meshes(verts=[vertex_glasses_out], faces=[object_faces], textures=mesh_object.textures)
+    mesh_object_fitted = Meshes(verts=[vertex_glasses_out.float()], faces=[object_faces.float()], textures=mesh_object.textures)
     return mesh_object_fitted
 
 
