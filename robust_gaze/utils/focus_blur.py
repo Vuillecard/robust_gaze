@@ -143,7 +143,6 @@ def composite_blur_stack(blur_stack, dist_left, dist_right, values_left, values_
     
     return composited
 
-
 def refocus_image(rgb, depth, focus_distance, aperture_size, quantile_vals, return_segments=False):
     quantile_vals_squeezed = quantile_vals.squeeze()
     dist_left, dist_right, calculated_quantiles_left, calculated_quantiles = compute_quantile_membership(depth, quantile_vals)
@@ -165,7 +164,6 @@ def replicate_batch(batch):
     
     return batch
 
-    
 def sample_idxs_2(quantiles):
     near = torch.arange(len(quantiles))[:1] #HARDCODED
     near = near[torch.randperm(len(near))[0]]
@@ -175,57 +173,6 @@ def sample_idxs_2(quantiles):
     
     return torch.stack((near, far))
 
-
-def defocus_blur_3D(rgb_batch, 
-                    depth_batch, 
-                    n_quantiles = 8, 
-                    severity = 1, 
-                    target_depth = None, 
-                    far_focus_penalty = 0.80):
-    
-    def refocus_image_(rgb, depth, focus_idxs, i, return_segments = False):
-        
-        with torch.no_grad():
-                        
-            device = depth.device
-            
-            quantiles = torch.arange(0, n_quantiles + 1, device = device) / n_quantiles
-            depth_normalized = depth            
-            
-            quantiles, quantile_vals = compute_quantiles(depth_normalized, quantiles, eps = 0.0001)
-            quantile_vals = quantile_vals.permute(1, 0)
-            
-            aperture =  severity + 2. #hard-coded!!
-            
-            focus_dist_idxs = sample_idxs_2(quantiles).cuda()
-            focus_idxs[i] = focus_dist_idxs
-            focus_dists = torch.gather(quantile_vals, 1, focus_dist_idxs.unsqueeze(0)).permute(1,0) 
-            
-            copies_to_return = 2
-            apertures = torch.tensor([[aperture]] * copies_to_return, dtype = torch.float32, device = device)
-            #apertures[1] = (apertures[1] - 2.5) / 2. #reduce aperture for far focus
-            apertures[1] = (apertures[1] - 1.5) / 1. #reduce aperture for far focus
-            
-            return refocus_image(rgb, depth_normalized, focus_dists, apertures, quantile_vals, return_segments)
-    
-    batch_size = len(rgb_batch)
-    
-    rgb_batch, depth_batch = replicate_batch(rgb_batch), replicate_batch(depth_batch)
-    
-    focus_idxs = [None] * len(rgb_batch)
-    
-    # apply defocusing to all copies of images in batch
-    modules = [refocus_image_ for _ in range(batch_size)]
-    args = [(rgb_batch[i], depth_batch[i], focus_idxs, i) for i in range(batch_size)]
-    composites = parallel_apply(modules, args)    
-    
-    # return all focus variants
-    outputs = None
-    outputs = composites[0].unsqueeze_(0)
-    for composite in composites[1:]:
-        outputs = torch.cat((outputs, composite.unsqueeze_(0)), dim = 0)
-        
-    return outputs, focus_idxs
 
 
 def load_rgb_depth(image_loc, depth_loc):
