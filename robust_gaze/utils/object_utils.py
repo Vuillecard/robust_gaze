@@ -1,6 +1,11 @@
 import numpy as np
+import torch
+import os 
+from typing import Dict
+
 try:
     from pytorch3d.io import load_objs_as_meshes, load_obj
+    from pytorch3d.structures import Meshes
 except:
     print("pytorch3d not installed, some functions will not work")
 
@@ -10,6 +15,39 @@ and handle some usful operations on 3d objects:
     fit_3d_object
     compute_inverse_transform
 """
+FIT_SUPPORT_INDEX = [3526,2736,1600,3542,1649,2012,1962,3908,3173,2252,785]
+DIR_3D_OBJECT = os.path.join(os.path.dirname(os.path.dirname(__file__)),'object_list')
+
+
+def wrapper_find_transform(target):
+    """ 
+    wrapper function to compute the transformation between two 3d objects for EMOCA 3d face
+    """
+    if not torch.is_tensor(target): 
+        target = torch.tensor(target)
+
+    path_head_template = os.path.join(DIR_3D_OBJECT,'head_template','head_template.obj')
+    source ,_= load_obj_file(path_head_template)
+
+    transform_mat, scale = fit_3d_object(target.numpy()[FIT_SUPPORT_INDEX].T,source.numpy()[FIT_SUPPORT_INDEX].T)
+
+    return { 'transform_mat': transform_mat, 'scale':scale}
+
+
+def apply_transform(mesh_object : Meshes, transformation: Dict) -> Meshes:
+    """
+    apply the transformation to a pytorth3d mesh object, and return the transformed mesh object
+    """
+    transform_mat = transformation['transform_mat']
+    object_verts = mesh_object.verts_list()[0]
+    object_faces = mesh_object.faces_list()[0]
+    # Apply the transformation to the glasses
+    vertex_glasses_out = transformation['scale']*(object_verts@transform_mat[:3,:3].T + transform_mat[:3,3])
+
+    # save the fitted object
+    mesh_object_fitted = Meshes(verts=[vertex_glasses_out], faces=[object_faces], textures=mesh_object.textures)
+    return mesh_object_fitted
+
 
 def fit_3d_object(target,source):
     """

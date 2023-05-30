@@ -1,2 +1,6 @@
 *.png
 .DS_Store
+
+# 3d objects
+*.obj
+*.mtl

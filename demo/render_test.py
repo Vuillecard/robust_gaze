@@ -104,6 +104,16 @@ R = R@torch.Tensor([[[1,  0.,  0.],
 print(R, T)
 cameras = FoVOrthographicCameras(device=device, R=R, T=T)
 
+new_vert = cameras.get_world_to_view_transform().transform_points(verts)
+new_vert = (new_vert + 1 )/2
+print(verts.shape)
+plt.figure(figsize=(10, 10))
+plt.scatter(-1*new_vert[:, 0], new_vert[:, 1], c=verts[:, 2], s=0.1)
+#plt.xlim(0, 224)
+#plt.ylim(0, 224)
+plt.savefig('test_vert.png')
+
+
 # Define the settings for rasterization and shading. Here we set the output image to be of size
 # 512x512. As we are rendering images for visualization purposes only we will set faces_per_pixel=1
 # and blur_radius=0.0. We also set bin_size and max_faces_per_bin to None which ensure that 

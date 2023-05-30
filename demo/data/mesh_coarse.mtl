@@ -1,3 +1,0 @@
-newmtl FaceTexture
-map_Kd mesh_coarse.png
-disp /idiap/temp/agupta/data/Gaze360/emoca_v2_mse/EMOCA_v2_lr_mse_20/00001000/mesh_coarse_normals.png
