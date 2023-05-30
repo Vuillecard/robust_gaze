@@ -1,6 +1,8 @@
 import os 
 from robust_gaze.utils.object_utils import load_obj_file, wrapper_find_transform,apply_transform
 from robust_gaze.utils.render_image import get_render
+from robust_gaze.utils.focus_blur import wrapper_focus_blur
+
 from typing import List,Union
 """
 class for the augmentation of face in 3D
@@ -24,10 +26,16 @@ class Face3DAugmentation():
             object_mesh = load_obj_file(os.path.join(self.dir_3d_object,obj,obj+'_template.obj'))
             self.objects_mesh[obj] = object_mesh
 
-    def blur(self,):
-        pass
+    def blur(self,rgb,depth,focus_scale):
+        return wrapper_focus_blur(rgb,depth,focus_scale)
+        
 
-    def process(self, image, face_obj, obj='glasses', lighting=((-1,0,0),)):
+    def process(self, image, face_obj, obj='glasses', lighting=((-1,0,0),), focus_id=None):
+        """
+        focus_id: value between 0 to 8, 0 is far focus and 8 is near focus
+        """
+        # if lighting is None:
+        #     lighting = (0,0,-1) # default lighting
 
         # find the transformation between template 3d face and predicted 3d face
         transformation = wrapper_find_transform(face_obj)

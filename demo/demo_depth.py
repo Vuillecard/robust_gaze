@@ -42,6 +42,7 @@ def main_tensor():
             depth_flat = img.reshape((img.shape[0],-1))
             quantile_vals = torch.quantile(depth_flat, quantiles, dim=1)
             print_stat(img)
+            print(quantile_vals)
             cv2.imwrite(file,img[0].numpy()*255)
             
             plt.figure()
