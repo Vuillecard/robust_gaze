@@ -109,3 +109,15 @@ class SRenderY(nn.Module):
         alpha_images = rendering[:, -1, :, :][:, None, :, :].detach()
         depth_images = rendering[:, :1, :, :]
         return depth_images
+    
+
+if __name__=='__main__':
+    
+    ###### get depth map
+    renderer = SRenderY(224, face_obj_file, uv_size=256)
+    trans_verts,_,_ = load_obj(face_obj_file)
+    op_depth = renderer.render_depth(trans_verts.unsqueeze(0))
+    depth_img = op_depth[0].permute(1,2,0)
+    depth_img = depth_img.squeeze().numpy()
+    depth_img = depth_img*65536
+    depth_img = depth_img.astype(np.uint16)
