@@ -1,7 +1,7 @@
 import os 
-from robust_gaze.utils.object_utils import load_obj_file, wrapper_find_transform,apply_transform
-from robust_gaze.utils.render_image import get_render
-from robust_gaze.utils.focus_blur import wrapper_focus_blur
+from utils.object_utils import load_obj_file, wrapper_find_transform,apply_transform
+from utils.render_image import get_render
+from utils.focus_blur import wrapper_focus_blur
 
 from typing import List,Union
 from pytorch3d.io import load_objs_as_meshes

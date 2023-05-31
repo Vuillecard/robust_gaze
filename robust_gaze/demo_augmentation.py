@@ -16,7 +16,7 @@ def main(args):
     Augmentor = Face3DAugmentation(object_names)
     
     # iterate over samples
-    vis = False
+    vis = True
     files = glob.glob(os.path.join(args.input_dir, '00*'))
    
     for sample in tqdm(files):
@@ -24,7 +24,7 @@ def main(args):
         sample_name = os.path.basename(sample)
         image = cv2.imread(os.path.join(sample, 'inputs.png'))
         face_mesh = load_objs_as_meshes([os.path.join(sample, 'mesh_coarse.obj')])
-        image_aug = Augmentor.process(image, face_mesh, 'hat')
+        image_aug = Augmentor.process(image, face_mesh, 'glasses')
         
         # save augmented image
         if vis:
