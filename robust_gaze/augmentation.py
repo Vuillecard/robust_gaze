@@ -1,13 +1,8 @@
 import os 
-<<<<<<< HEAD
-from utils.object_utils import load_obj_file, wrapper_find_transform,apply_transform
-from utils.render_image import get_render
-=======
 from robust_gaze.utils.object_utils import load_obj_file, wrapper_find_transform,apply_transform
 from robust_gaze.utils.render_image import get_render
 from robust_gaze.utils.focus_blur import wrapper_focus_blur
 
->>>>>>> b8c416d81a730e7b65c02ca169dd36620ca3ba9d
 from typing import List,Union
 from pytorch3d.io import load_objs_as_meshes
 """
@@ -43,6 +38,7 @@ class Face3DAugmentation():
         # if lighting is None:
         #     lighting = (0,0,-1) # default lighting
 
+        print('processing object: ',obj)
         # find the transformation between template 3d face and predicted 3d face
         transformation = wrapper_find_transform(face_obj)
         # apply the transformation to the 3d object
