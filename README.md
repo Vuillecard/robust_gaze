@@ -48,21 +48,21 @@ The augmentation will be saved in the /output folder.
 
 ## Code structure
 
-.
-├── data                                # Sample for demonstration 
-├── demo                                # Demo code to run and understand the code 
-├── output                              # output if any
-├── robust_gaze                         # Source files 
-    ├── object_list                     # List of object and texture used for augmentation
-    ├── augmentation.py                 # Class for augmentation 
-    └── utils                           # Utility functions
-        ├── face_depth.py               # script to generate face depth map
-        ├── face_depth_utils.py         # utility functions for face depth map
-        ├── focus_blur.py               # script to generate focus blur
-        ├── object_utils.py             # utility functions for object augmentation
-        ├── render_image.py             # script to render image
-        ├── image.py                    # script to help handle image
-        ├── video_utils.py              # script to help handle video
-        └── visualize_utils.py          # script to help handle visualization    
-└── README.md
+    .
+    ├── Data                                # Sample for demonstration 
+    ├── Demo                                # Demo code to run and understand the code 
+    ├── Output                              # output if any
+    ├── Robust_gaze                         # Source files 
+        ├── object_list                     # List of object and texture used for augmentation
+        ├── augmentation.py                 # Class for augmentation 
+        └── Utils                           # Utility functions
+            ├── face_depth.py               # script to generate face depth map
+            ├── face_depth_utils.py         # utility functions for face depth map
+            ├── focus_blur.py               # script to generate focus blur
+            ├── object_utils.py             # utility functions for object augmentation
+            ├── render_image.py             # script to render image
+            ├── image.py                    # script to help handle image
+            ├── video_utils.py              # script to help handle video
+            └── visualize_utils.py          # script to help handle visualization    
+    └── README.md
 
