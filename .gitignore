@@ -1,7 +1,8 @@
-*.png
+#*.png
 .DS_Store
 /__pycache__/
 *.pyc
 # 3d objects
-*.obj
-*.mtl
+#*.obj
+#*.mtl
+*/object_list

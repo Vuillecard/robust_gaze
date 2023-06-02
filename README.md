@@ -20,9 +20,10 @@ conda develop /path/to/robust_gaze_directory
 Then, install the dependencies: 
 - Since pytorch3d have different configuration for different system please follow official instruction to install [Pytorch3D](https://github.com/facebookresearch/pytorch3d/blob/main/INSTALL.md)
 - On the same pytroch3d installation page install pytorch3d as proposed.
+    - current version pytorch3d==0.7.3, pytorch==1.13.0, torchvision==0.14.0
 - then install opencv, nastort, skimage, PIL, matplotlib and numpy.
 ```bash
-pip install opencv-python
+pip install opencv-python==4.7.0
 pip install nastort
 pip install scikit-image
 pip install Pillow
