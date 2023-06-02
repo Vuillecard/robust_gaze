@@ -1,6 +1,6 @@
 # robust_gaze
 
-Robust gaze data augmentation for deep learning based gaze estimation.
+3D face data augmentation for deep learning based gaze estimation robustness improvement.
 
 
 ## Installation
@@ -17,16 +17,31 @@ for easy import you can add the path to the project path to the conda python pat
 conda develop /path/to/robust_gaze_directory
 ```
 
-
 Then, install the dependencies: 
-- follow instruction to install [Pytorch3D](https://github.com/facebookresearch/pytorch3d/blob/main/INSTALL.md)
+- Since pytorch3d have different configuration for different system please follow official instruction to install [Pytorch3D](https://github.com/facebookresearch/pytorch3d/blob/main/INSTALL.md)
 - On the same pytroch3d installation page install pytorch3d as proposed.
-- then install nastort, skimage, PIL, matplotlib and numpy.
+- then install opencv, nastort, skimage, PIL, matplotlib and numpy.
+```bash
+pip install opencv-python
+pip install nastort
+pip install scikit-image
+pip install Pillow
+pip install matplotlib
+pip install numpy
+```
 
-Regarding, the face 3d model please refer to the installation of emoca model [here](https://github.com/radekd91/emoca#installation)
+Regarding, the face 3d model EMOCA please refer to the installation of emoca model [here](https://github.com/radekd91/emoca#installation)
 
-
+Moreover, the model used for the gaze prediction is the gaze360 model. Please refer to the installation of gaze360 model [here](https://github.com/erkil1452/gaze360)
 ## How to run the code
 
-in the /demo folder you can find demo script of how to apply augmentation on a single image, batch of image or video for dynamic augmentation. 
+In the /demo folder you can find demo script of how to apply augmentation on a single image, batch of image or video for dynamic augmentation. 
 in robust_gaze/object_list you can find the list of objects and texture  used for augmentation.
+
+We put a sample example in /data/sample_example to run the code on a single image in the /demo folder. To run the code on a single image run the following command:
+
+```bash
+cd demo
+python demo_single_image.py
+```
+The augmentation will be saved in the /output folder.
