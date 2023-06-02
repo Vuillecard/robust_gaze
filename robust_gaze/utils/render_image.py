@@ -20,6 +20,7 @@ from pytorch3d.renderer import (
     Textures,
     BlendParams
 )
+import torchvision.transforms as Transforms
 
 # render lighting and accessory
 def render(face_mesh, acc_mesh, ambient=False, mode='face', direction=((-1,0,0),), specular_color=None):
@@ -58,7 +59,7 @@ def render(face_mesh, acc_mesh, ambient=False, mode='face', direction=((-1,0,0),
 
     # Define the settings for rasterization and shading
     raster_settings = RasterizationSettings(
-        image_size=224, 
+        image_size=512, 
         blur_radius=0.0, 
         faces_per_pixel=1)
 
@@ -106,6 +107,10 @@ def render(face_mesh, acc_mesh, ambient=False, mode='face', direction=((-1,0,0),
                     shininess = 0
                 )
     images = renderer(mesh, materials=materials, blend_params=blend_params)
+    # resize image to 224
+    images = images.permute(0,3,1,2)
+    images = Transforms.Resize((224,224))(images)
+    images = images.permute(0,2,3,1)
     return images
 
 
@@ -153,8 +158,9 @@ def get_render(image, face_mesh, acc_mesh, direction, specular_color):
     acc_img = light_img_acc*mask_acc + modulated_image_scaled*(1-mask_acc)
     
     acc_img = acc_img * 255
-    acc_img = np.clip(acc_img, 0, 255).astype(np.uint8)
-    
+    #acc_img = np.clip(acc_img, 0, 255).astype(np.uint8)
+    acc_img = np.clip(acc_img, 0, 255)
+
     return acc_img
     
     

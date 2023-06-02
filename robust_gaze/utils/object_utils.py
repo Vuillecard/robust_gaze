@@ -34,7 +34,6 @@ def wrapper_find_transform(target):
 
     return { 'transform_mat': transform_mat, 'scale':scale}
 
-
 def apply_transform(mesh_object : Meshes, transformation: Dict) -> Meshes:
     """
     apply the transformation to a pytorth3d mesh object, and return the transformed mesh object

@@ -1,3 +1,29 @@
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from skimage.io import imread
+from pytorch3d.structures import Meshes
+from pytorch3d.io import load_obj
+from pytorch3d.renderer.mesh import rasterize_meshes
+import robust_gaze.utils.face_depth_utils as util
+
+
+def wrapper_get_depth(face_mesh, img_size=224):
+
+    renderer = SRenderY(img_size, face_mesh, uv_size=256)
+    trans_verts = face_mesh.verts_list()[0]
+    op_depth = renderer.render_depth(trans_verts.unsqueeze(0))
+    depth_img = op_depth[0].permute(1,2,0)
+    depth_img = depth_img.squeeze().float().numpy()
+
+    return depth_img
+
+"""
+This code is taken from :
+https://github.com/radekd91/emoca/blob/release/EMOCA_v2/gdl/models/Renderer.py
+"""
+
 class Pytorch3dRasterizer(nn.Module):
     """
     This class implements methods for rasterizing a batch of heterogenous
@@ -57,27 +83,31 @@ class Pytorch3dRasterizer(nn.Module):
 
 
 class SRenderY(nn.Module):
-    def __init__(self, image_size, obj_filename, uv_size=256):
+    def __init__(self, image_size, mesh_object, uv_size=256):
         super(SRenderY, self).__init__()
         self.image_size = image_size
         self.uv_size = uv_size
-
-        verts, faces, aux = load_obj(obj_filename)
+        
+        verts = mesh_object.verts_list()[0]
+        faces = mesh_object.faces_list()[0]
+        #textures = mesh_object.textures_list()[0]
 #         uvcoords = aux.verts_uvs[None, ...]  # (N, V, 2)
-        uvfaces = faces.textures_idx[None, ...]  # (N, F, 3)
-        faces = faces.verts_idx[None, ...]
+        #uvfaces = faces.textures_idx[None, ...]  # (N, F, 3)
+        #uvfaces = textures
+        #faces = faces.verts_idx[None, ...]
+
         self.rasterizer = Pytorch3dRasterizer(image_size)
         self.uv_rasterizer = Pytorch3dRasterizer(uv_size)
 
         # faces
-        dense_triangles = util.generate_triangles(uv_size, uv_size)
-        self.register_buffer('dense_faces', torch.from_numpy(dense_triangles).long()[None, :, :])
+        #dense_triangles = util.generate_triangles(uv_size, uv_size)
+        #self.register_buffer('dense_faces', torch.from_numpy(dense_triangles).long()[None, :, :])
         self.register_buffer('faces', faces)
 
         # shape colors, for rendering shape overlay
         colors = torch.tensor([255, 255, 255])[None, None, :].repeat(1, faces.max() + 1, 1).float() / 255.
-        face_colors = util.face_vertices(colors, faces)
-        self.register_buffer('face_colors', face_colors)
+        #face_colors = util.face_vertices(colors, faces)
+        #self.register_buffer('face_colors', face_colors)
 
         ## SH factors for lighting
         pi = np.pi
@@ -100,6 +130,7 @@ class SRenderY(nn.Module):
         z = -transformed_vertices[:, :, 2:].repeat(1, 1, 3)
         z = z - z.min()
         z = z / z.max()
+        
         # Attributes
         attributes = util.face_vertices(z, self.faces.expand(batch_size, -1, -1))
         # rasterize
@@ -109,11 +140,12 @@ class SRenderY(nn.Module):
         alpha_images = rendering[:, -1, :, :][:, None, :, :].detach()
         depth_images = rendering[:, :1, :, :]
         return depth_images
-    
+
 
 if __name__=='__main__':
     
     ###### get depth map
+    face_obj_file = None
     renderer = SRenderY(224, face_obj_file, uv_size=256)
     trans_verts,_,_ = load_obj(face_obj_file)
     op_depth = renderer.render_depth(trans_verts.unsqueeze(0))

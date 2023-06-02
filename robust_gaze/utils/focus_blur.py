@@ -6,6 +6,7 @@ from torch.nn.parallel import parallel_apply
 import torchvision.transforms.functional as TF
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
+import numpy as np
 
 """
 Code to generate near and far focus blur.
@@ -13,6 +14,71 @@ code taken from :
 https://github.com/EPFL-VILAB/3DCommonCorruptions/blob/main/create_3dcc/create_dof.py
 """
 
+def load_rgb_depth(image_loc, depth_loc):
+    rgb = TF.to_tensor(Image.open(image_loc).convert("RGB"))
+    depth = TF.to_tensor(Image.open(depth_loc))
+    depth_normalized = depth.float()/(2.0**16)
+    min_depth = depth_normalized[depth_normalized > 0.1].min()
+    max_depth = depth_normalized.max() 
+    depth_normalized = (depth_normalized - min_depth) / (max_depth - min_depth)
+    depth_normalized = 0.9*depth_normalized + 0.1
+    depth_normalized[depth_normalized <= 0.1] = 0.1 # set min depth to 0.15 as a background
+    depth_normalized[depth_normalized >= 1.0] = depth_normalized[depth_normalized < 1.0].max()
+    rgb = rgb[None,...] # [1,3,h,w]
+    return rgb, depth
+
+def wrapper_focus_blur(rgb, depth, focus_dists_idx = 3):
+
+    """ Function to apply defocus blur to a single image using normalized depth map,
+        focus_dists_idx from 0 focus far to 8 focus near
+    """
+    if isinstance(rgb, str) and isinstance(depth, str):
+        rgb, depth = load_rgb_depth(rgb, depth)
+    elif isinstance(rgb, np.ndarray) and isinstance(depth, np.ndarray):
+        rgb = torch.from_numpy(rgb).float().permute(2,0,1)[None,...]
+        depth = torch.from_numpy(depth).float()[None,...]
+        print(rgb.shape, depth.shape)
+    n, c, h, w = rgb.shape
+    assert n == 1, 'batch size must be 1'
+    assert c == 3, 'rgb must have 3 channels'
+    assert depth.shape == ( 1, h, w), 'depth must have 1 channel'
+    assert depth.max() <= 1.0, 'depth must be normalized'
+    assert depth.min() >= 0.0, 'depth must be normalized'
+
+    min_depth = depth[depth > 0.1].min()
+    max_depth = depth.max() 
+    depth = (depth - min_depth) / (max_depth - min_depth)
+    depth = 0.9*depth + 0.1
+    depth[depth <= 0.1] = 0.1 # set min depth to 0.15 as a background
+    depth[depth >= 1.0] = depth[depth < 1.0].max()
+
+    n_quantiles = 8 #hard-coded!!
+    assert focus_dists_idx <= n_quantiles, 'focus_dists_idx must be less than n_quantiles'
+
+    device = 'cpu'
+
+    quantiles = torch.arange(0, n_quantiles + 1, device = device) / n_quantiles
+    depth_normalized = depth            
+    
+    quantiles, quantile_vals = compute_quantiles(depth, quantiles, eps = 0.0001)
+    quantile_vals = quantile_vals.permute(1, 0)
+
+    print(quantile_vals.shape)
+    if focus_dists_idx >= 2:
+        aperture =  10
+    else:
+        aperture =  3  #hard-coded!!
+    
+    focus_dists = quantile_vals[:,focus_dists_idx]
+
+    copies_to_return = 1
+    apertures = torch.tensor([[aperture]] * copies_to_return, dtype = torch.float32, device = device)
+    #apertures[1] = (apertures[1] - 2.5) / 2. #reduce aperture for far focus
+    #apertures[0] = (apertures[0] - 1.5) / 1. #reduce aperture for far focus
+    
+    image_out= refocus_image(rgb, depth_normalized, focus_dists, apertures, quantile_vals)
+
+    return image_out[0].permute(1,2,0).numpy()
 
 def gaussian(M, std, sym=True, device=None):
     
@@ -48,7 +114,7 @@ def separable_gaussian(img, r=3.5, cutoff=None, device=None):
     fil = gaussian(cutoff, std, device=device).to(device)
     filsum = fil.sum() #/ n_channels
     fil = torch.stack([fil] * n_channels, dim=0)
-    r_pad = int(cutoff) 
+    r_pad = int(cutoff)
     r_pad_half = r_pad // 2
     #print(r_pad_half)
     img = F.pad(img, (r_pad_half, r_pad_half, r_pad_half, r_pad_half), "replicate", 0)  # effectively zero padding
@@ -109,7 +175,10 @@ def get_blur_stack_single_image(rgb, blur_radii, cutoff_multiplier):
     
     blurred_ims = []
     
-    blurred_ims = parallel_apply([separable_gaussian]*len(args), args)
+    if torch.cuda.is_available():
+        blurred_ims = parallel_apply([separable_gaussian]*len(args), args)
+    else : 
+        blurred_ims = [separable_gaussian(*arg) for arg in args]
     blurred_ims = torch.stack(blurred_ims, dim=1)
     
     return blurred_ims
@@ -119,12 +188,13 @@ def get_blur_stack(rgb, blur_radii, cutoff_multiplier=None):
     args = [(image.unsqueeze(0), radii, cutoff_multiplier) for image, radii in zip(rgb, blur_radii)]
     modules = [get_blur_stack_single_image for _ in args]
     outputs = []
-    
 
-    outputs = parallel_apply(modules, args)
-    
+    if torch.cuda.is_available():
+        outputs = parallel_apply(modules, args)
+    else:
+        outputs = [module(*arg) for module, arg in zip(modules, args)]
+
     return torch.cat(outputs, dim=0)
-
 
 def composite_blur_stack(blur_stack, dist_left, dist_right, values_left, values_right):
     
@@ -174,7 +244,6 @@ def sample_idxs_2(quantiles):
     return torch.stack((near, far))
 
 
-
 def load_rgb_depth(image_loc, depth_loc):
     rgb = TF.to_tensor(Image.open(image_loc).convert("RGB"))
     depth = TF.to_tensor(Image.open(depth_loc))
@@ -188,46 +257,5 @@ def load_rgb_depth(image_loc, depth_loc):
     rgb = rgb[None,...] # [1,3,h,w]
     return rgb, depth
 
-def wrapper_focus_blur(rgb, depth, focus_dists_idx = 3):
 
-    """ Function to apply defocus blur to a single image using normalized depth map,
-        focus_dists_idx from 0 focus far to 8 focus near
-    """
-    if isinstance(rgb, str) and isinstance(depth, str):
-        rgb, depth = load_rgb_depth(rgb, depth)
-    else : 
-        n, c, h, w = rgb.shape
-        assert n == 1, 'batch size must be 1'
-        assert c == 3, 'rgb must have 3 channels'
-        assert depth.shape == (1, 1, h, w), 'depth must have 1 channel'
-        assert depth.max() <= 1.0, 'depth must be normalized'
-        assert depth.min() >= 0.0, 'depth must be normalized'
-
-    n_quantiles = 8 #hard-coded!!
-    assert focus_dists_idx <= n_quantiles, 'focus_dists_idx must be less than n_quantiles'
-
-    device = 'cpu'
-
-    quantiles = torch.arange(0, n_quantiles + 1, device = device) / n_quantiles
-    depth_normalized = depth            
-    
-    quantiles, quantile_vals = compute_quantiles(depth, quantiles, eps = 0.0001)
-    quantile_vals = quantile_vals.permute(1, 0)
-    
-    print(quantile_vals.shape)
-    if focus_dists_idx >= 2:
-        aperture =  10
-    else:
-        aperture =  3  #hard-coded!!
-    
-    focus_dists = quantile_vals[:,focus_dists_idx]
-
-    copies_to_return = 1
-    apertures = torch.tensor([[aperture]] * copies_to_return, dtype = torch.float32, device = device)
-    #apertures[1] = (apertures[1] - 2.5) / 2. #reduce aperture for far focus
-    #apertures[0] = (apertures[0] - 1.5) / 1. #reduce aperture for far focus
-    
-    image_out= refocus_image(rgb, depth_normalized, focus_dists, apertures, quantile_vals)
-
-    return image_out[0]
    
