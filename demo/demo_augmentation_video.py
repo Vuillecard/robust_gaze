@@ -14,6 +14,7 @@ import numpy as np
 This script shows how to run dynamic augmentation on a video sequence
 """
 
+
 def main(args):
         
     # create augmentor object

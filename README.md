@@ -37,7 +37,9 @@ Moreover, the model used for the gaze prediction is the gaze360 model. Please re
 ## How to run the code
 
 In the /demo folder you can find demo script of how to apply augmentation on a single image, batch of image or video for dynamic augmentation. 
-in robust_gaze/object_list you can find the list of objects and texture  used for augmentation.
+To run the augmentation with the virtual object you need to load them from here : 
+https://drive.google.com/drive/folders/1dIpGP5Hr5tQYuoAQeQcta6vyZ_fSBkr2?usp=sharing
+Then you can past it in robust_gaze/object_list
 
 We put a sample example in /data/sample_example to run the code on a single image in the /demo folder. To run the code on a single image run the following command:
 
